@@ -407,3 +407,45 @@ Include: summary, timeline, impact assessment, and recommended follow-up actions
     async def close(self) -> None:
         """Close the HTTP client."""
         await self._client.aclose()
+
+
+async def ask_gemma(query: str, telemetry: Optional[dict] = None) -> tuple[str, str]:
+    """
+    Direct prompt to Gemma 4 via Ollama for operator questions, mission queries,
+    and RF tactical guidance.
+    """
+    system_instruction = (
+        "You are Gemma 4, the integrated AI Copilot for SpectrumGuard and the Drone X4 platform. "
+        "You provide expert drone flight safety, RF spectrum analysis, anti-jamming tactical decisions, "
+        "and telemetry diagnostics. Be concise, highly professional, accurate, and safety-first. "
+        "Keep your response under 150 words."
+    )
+    prompt = f"{system_instruction}\n\n"
+    if telemetry:
+        prompt += f"Current Live Drone Telemetry:\n{json.dumps(telemetry, indent=2)}\n\n"
+    prompt += f"Operator Question:\n{query}\n\nResponse:"
+
+    try:
+        async with httpx.AsyncClient(timeout=30) as client:
+            res = await client.post(
+                OLLAMA_URL,
+                json={
+                    "model": MODEL,
+                    "prompt": prompt,
+                    "stream": False,
+                    "options": {"temperature": 0.3},
+                },
+            )
+            if res.status_code == 200:
+                data = res.json()
+                if "response" in data:
+                    return data["response"].strip(), "local_gemma4_ollama"
+    except Exception:
+        pass
+
+    return (
+        f"Gemma 4 Copilot advisory: For query '{query}', ensure all RF ISM channels are monitored "
+        f"and the fail-safe Return-to-Home parameters are locked.",
+        "fallback_rule_engine",
+    )
+

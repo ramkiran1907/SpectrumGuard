@@ -17,7 +17,8 @@ from pydantic import BaseModel
 sys.path.insert(0, os.path.dirname(__file__))
 
 from safety_rules import assess_risk
-from gemma_client import explain_incident
+from gemma_client import explain_incident, ask_gemma
+import httpx
 
 
 # ── App Setup ────────────────────────────────────────────────────────────
@@ -42,6 +43,11 @@ class Telemetry(BaseModel):
     gps_satellites: int
 
 
+class ChatRequest(BaseModel):
+    query: str
+    telemetry: dict | None = None
+
+
 # ── Endpoints ────────────────────────────────────────────────────────────
 
 @app.get("/")
@@ -49,6 +55,34 @@ async def root():
     return {
         "service": "SpectrumGuard",
         "status": "operational",
+        "ai_engine": "Gemma 4 (Ollama)",
+    }
+
+
+@app.get("/health")
+async def health():
+    gemma_status = "offline"
+    model_name = "gemma4"
+    try:
+        async with httpx.AsyncClient(timeout=3) as client:
+            res = await client.get("http://localhost:11434/api/tags")
+            if res.status_code == 200:
+                models = res.json().get("models", [])
+                gemma_status = "connected"
+                names = [m.get("name") for m in models]
+                if any("gemma4" in n for n in names):
+                    gemma_status = "gemma4_ready"
+    except Exception:
+        pass
+
+    return {
+        "status": "healthy",
+        "gemma": {
+            "status": gemma_status,
+            "model": model_name,
+            "provider": "Ollama Local",
+            "url": "http://localhost:11434",
+        },
     }
 
 
@@ -63,7 +97,19 @@ async def analyze(data: Telemetry):
         "recommended_action": action,
         "gemma_explanation": explanation,
         "source": source,
+        "model": "gemma4:latest",
     }
+
+
+@app.post("/chat")
+async def chat(req: ChatRequest):
+    response, source = await ask_gemma(req.query, req.telemetry)
+    return {
+        "response": response,
+        "source": source,
+        "model": "gemma4:latest",
+    }
+
 
 
 # ── Entry Point ──────────────────────────────────────────────────────────

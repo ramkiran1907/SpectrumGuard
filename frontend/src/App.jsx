@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import './aerovision.css';
+import VideoLandingPage from './VideoLandingPage';
 import { 
   Shield, 
   AlertTriangle, 
@@ -9,7 +11,6 @@ import {
   Wifi, 
   Satellite, 
   Clock, 
-  Server, 
   Cpu, 
   RefreshCw, 
   Play, 
@@ -17,12 +18,21 @@ import {
   Sliders,
   Terminal,
   Zap,
-  Info
+  Eye,
+  ExternalLink,
+  ChevronRight,
+  X
 } from 'lucide-react';
 
 const API_URL = 'http://localhost:8000';
 
 export default function App() {
+  // Navigation / View Tabs: 'video' | 'showcase' | 'spectrumguard' | 'both'
+  const [activeTab, setActiveTab] = useState('video');
+  const [showReferenceModal, setShowReferenceModal] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+  const [showToast, setShowToast] = useState(false);
+
   // Telemetry Form State
   const [telemetry, setTelemetry] = useState({
     packet_loss_percent: 45,
@@ -45,7 +55,7 @@ export default function App() {
   const [simulatedState, setSimulatedState] = useState('degraded');
   const [isSimulatingTimeline, setIsSimulatingTimeline] = useState(false);
 
-  // Preset Configurations
+  // Presets
   const presets = {
     normal: {
       name: 'Normal Flight',
@@ -64,10 +74,16 @@ export default function App() {
     },
   };
 
+  // Toast Helper
+  const triggerToast = (msg) => {
+    setToastMessage(msg);
+    setShowToast(true);
+    setTimeout(() => setShowToast(false), 2400);
+  };
+
   // Check backend health on mount
   useEffect(() => {
     fetchHealth();
-    // Auto-analyze initial preset
     runAnalysis(telemetry);
   }, []);
 
@@ -79,7 +95,7 @@ export default function App() {
       } else {
         setBackendStatus('error');
       }
-    } catch (e) {
+    } catch {
       setBackendStatus('offline');
     }
   };
@@ -101,7 +117,7 @@ export default function App() {
 
       const result = await response.json();
       setAnalysis(result);
-      setApprovalState(null); // Reset operator approval for new incident
+      setApprovalState(null);
       setApprovalTimestamp(null);
     } catch (err) {
       console.error('Analysis error:', err);
@@ -111,25 +127,26 @@ export default function App() {
     }
   };
 
-  // Handle Preset Selection
   const applyPreset = (key) => {
     const preset = presets[key];
     if (preset) {
       setSimulatedState(key);
       setTelemetry(preset.data);
       runAnalysis(preset.data);
+      triggerToast(`Applied ${preset.name} telemetry`);
     }
   };
 
-  // Handle Operator Approval
   const handleApprove = () => {
     setApprovalState('approved');
     setApprovalTimestamp(new Date().toLocaleTimeString());
+    triggerToast('Countermeasure Approved by Operator');
   };
 
   const handleReject = () => {
     setApprovalState('rejected');
     setApprovalTimestamp(new Date().toLocaleTimeString());
+    triggerToast('Countermeasure Rejected');
   };
 
   // Timeline Auto-Step Simulator
@@ -149,41 +166,41 @@ export default function App() {
     return () => clearInterval(timer);
   }, [isSimulatingTimeline]);
 
-  // Risk Color Mapping
+  // Risk styling
   const getRiskStyle = (risk) => {
     switch (risk) {
       case 'CRITICAL':
         return {
-          bg: 'bg-rose-500/10',
+          bg: 'bg-rose-950/40',
           border: 'border-rose-500/50',
           text: 'text-rose-400',
           glow: 'shadow-[0_0_20px_rgba(244,63,94,0.3)]',
-          badge: 'bg-rose-500 text-white',
+          badge: 'bg-rose-600 text-white',
         };
       case 'HIGH':
         return {
-          bg: 'bg-amber-500/10',
+          bg: 'bg-amber-950/40',
           border: 'border-amber-500/50',
           text: 'text-amber-400',
           glow: 'shadow-[0_0_20px_rgba(245,158,11,0.3)]',
-          badge: 'bg-amber-500 text-slate-950 font-bold',
+          badge: 'bg-amber-500 text-black font-bold',
         };
       case 'MEDIUM':
         return {
-          bg: 'bg-yellow-500/10',
+          bg: 'bg-yellow-950/40',
           border: 'border-yellow-500/50',
           text: 'text-yellow-400',
           glow: 'shadow-[0_0_15px_rgba(234,179,8,0.25)]',
-          badge: 'bg-yellow-500 text-slate-950 font-semibold',
+          badge: 'bg-yellow-500 text-black font-semibold',
         };
       case 'LOW':
       default:
         return {
-          bg: 'bg-emerald-500/10',
+          bg: 'bg-emerald-950/40',
           border: 'border-emerald-500/50',
           text: 'text-emerald-400',
           glow: 'shadow-[0_0_15px_rgba(16,185,129,0.25)]',
-          badge: 'bg-emerald-500 text-slate-950 font-bold',
+          badge: 'bg-emerald-500 text-black font-bold',
         };
     }
   };
@@ -191,602 +208,770 @@ export default function App() {
   const riskStyle = analysis ? getRiskStyle(analysis.risk) : getRiskStyle('LOW');
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8 space-y-8">
-      {/* ── HEADER ── */}
-      <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-slate-800">
-        <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-xl bg-gradient-to-tr from-indigo-600 to-cyan-500 flex items-center justify-center shadow-lg shadow-indigo-500/20">
-            <Shield className="w-7 h-7 text-white" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-2xl font-bold text-white tracking-tight">SpectrumGuard</h1>
-              <span className="text-xs px-2 py-0.5 rounded-full font-mono bg-indigo-500/20 text-indigo-300 border border-indigo-500/40">
-                v0.1.0
-              </span>
+    <>
+      {activeTab === 'video' ? (
+        <VideoLandingPage 
+          onNavigateTab={setActiveTab} 
+          backendStatus={backendStatus} 
+          activeTab={activeTab} 
+        />
+      ) : (
+        <div className="poster-wrapper">
+          {/* ── TOP CONTROL & NAVIGATION BAR ── */}
+          <nav className="top-nav">
+            <div className="nav-brand">
+              <span>DRONE X4</span>
+              <span className="nav-badge">AEROVISION</span>
             </div>
-            <p className="text-sm text-slate-400">
-              RF Spectrum Safety Monitor & Gemma AI Incident Copilot
-            </p>
-          </div>
-        </div>
 
-        {/* Backend status & telemetry indicator */}
-        <div className="flex items-center gap-3 text-xs font-mono">
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800">
-            <span className="text-slate-400">ENDPOINT:</span>
-            <span className="text-indigo-400">{API_URL}/analyze</span>
-          </div>
-
-          <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border ${
-            backendStatus === 'online' 
-              ? 'bg-emerald-950/40 border-emerald-500/30 text-emerald-400' 
-              : 'bg-rose-950/40 border-rose-500/30 text-rose-400'
-          }`}>
-            <span className={`w-2 h-2 rounded-full ${backendStatus === 'online' ? 'bg-emerald-400 animate-pulse' : 'bg-rose-500'}`} />
-            <span>{backendStatus === 'online' ? 'API ONLINE' : 'API OFFLINE'}</span>
-          </div>
-        </div>
-      </header>
-
-      {/* ── SIMULATED INTERFERENCE TIMELINE BANNER ── */}
-      <section className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 relative overflow-hidden backdrop-blur-sm">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4">
-          <div className="flex items-center gap-2.5">
-            <Radio className="w-5 h-5 text-indigo-400" />
-            <h2 className="text-base font-semibold text-slate-200">
-              Simulated RF Interference Timeline
-            </h2>
-            <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 uppercase tracking-wider font-semibold">
-              ⚠️ Simulated Data
-            </span>
-          </div>
-
-          <button
-            onClick={() => setIsSimulatingTimeline(!isSimulatingTimeline)}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-              isSimulatingTimeline 
-                ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/30' 
-                : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
-            }`}
-          >
-            {isSimulatingTimeline ? (
-              <>
-                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                Auto-Cycle: Active
-              </>
-            ) : (
-              <>
-                <Play className="w-3.5 h-3.5" />
-                Start Auto-Cycle
-              </>
-            )}
-          </button>
-        </div>
-
-        {/* Timeline States Bar */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          {Object.entries(presets).map(([key, item]) => {
-            const isSelected = simulatedState === key;
-            const stateColors = {
-              normal: 'border-emerald-500/40 bg-emerald-500/5 hover:border-emerald-500/70',
-              degraded: 'border-amber-500/40 bg-amber-500/5 hover:border-amber-500/70',
-              jammed: 'border-rose-500/40 bg-rose-500/5 hover:border-rose-500/70',
-            };
-            const activeColors = {
-              normal: 'border-emerald-500 bg-emerald-500/15 ring-2 ring-emerald-500/30',
-              degraded: 'border-amber-500 bg-amber-500/15 ring-2 ring-amber-500/30',
-              jammed: 'border-rose-500 bg-rose-500/15 ring-2 ring-rose-500/30',
-            };
-
-            return (
-              <button
-                key={key}
-                onClick={() => applyPreset(key)}
-                className={`text-left p-4 rounded-xl border transition-all relative ${
-                  isSelected ? activeColors[key] : stateColors[key]
-                }`}
+            <div className="nav-links">
+              <button 
+                onClick={() => setActiveTab('video')}
+                className={`nav-btn ${activeTab === 'video' ? 'active' : ''}`}
+                style={{ background: '#06b6d4', color: '#000', fontWeight: 'bold' }}
               >
-                <div className="flex items-center justify-between mb-1">
-                  <div className="flex items-center gap-2">
-                    <span className={`w-2.5 h-2.5 rounded-full ${
-                      key === 'normal' ? 'bg-emerald-400' : key === 'degraded' ? 'bg-amber-400' : 'bg-rose-500'
-                    }`} />
-                    <span className="font-semibold text-sm capitalize text-white">
-                      {item.name}
-                    </span>
-                  </div>
-                  <span className="text-[10px] font-mono text-slate-400 uppercase">
-                    [SIMULATED]
-                  </span>
-                </div>
-                <p className="text-xs text-slate-400 line-clamp-1">{item.desc}</p>
-                <div className="mt-3 flex items-center gap-3 text-[11px] font-mono text-slate-300">
-                  <span>Loss: {item.data.packet_loss_percent}%</span>
-                  <span>RSSI: {item.data.rssi_dbm}dBm</span>
-                  <span>GPS: {item.data.gps_satellites}</span>
-                </div>
+                🎬 Video Landing Page
               </button>
-            );
-          })}
-        </div>
-      </section>
-
-      {/* ── OPERATOR APPROVAL CARD (USER REQUEST REQUIREMENT) ── */}
-      {analysis && (
-        <section className={`rounded-2xl border p-6 transition-all ${riskStyle.bg} ${riskStyle.border} ${riskStyle.glow}`}>
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-mono uppercase tracking-wider text-slate-400">
-                  DECISION ENGINE RECOMMENDATION
-                </span>
-                <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold font-mono ${riskStyle.badge}`}>
-                  {analysis.risk} RISK
-                </span>
-              </div>
-              <div className="text-xl font-bold text-white flex items-center gap-2">
-                <span>Gemma recommends:</span>
-                <span className={`underline decoration-2 ${riskStyle.text}`}>
-                  {analysis.recommended_action}
-                </span>
-              </div>
-              <p className="text-sm text-slate-300">
-                Autonomous drone action is paused awaiting pilot command confirmation.
-              </p>
+              <button 
+                onClick={() => setActiveTab('showcase')}
+                className={`nav-btn ${activeTab === 'showcase' ? 'active' : ''}`}
+              >
+                Product Showcase
+              </button>
+              <button 
+                onClick={() => setActiveTab('both')}
+                className={`nav-btn ${activeTab === 'both' ? 'active' : ''}`}
+              >
+                Showcase + RF Monitor
+              </button>
+              <button 
+                onClick={() => setActiveTab('spectrumguard')}
+                className={`nav-btn ${activeTab === 'spectrumguard' ? 'active' : ''}`}
+              >
+                🛡️ SpectrumGuard™ Copilot
+              </button>
+              <button 
+                onClick={() => setShowReferenceModal(true)}
+                className="nav-btn flex items-center gap-1"
+                title="Inspect original UI design reference"
+              >
+                <Eye className="w-3.5 h-3.5" />
+                Reference
+              </button>
             </div>
 
-            {/* Approve / Reject Buttons */}
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-              {approvalState === null ? (
-                <>
-                  <div className="text-xs font-mono text-slate-400 self-center hidden sm:block">
-                    Operator approval required:
-                  </div>
-                  <button
-                    onClick={handleApprove}
-                    className="flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold shadow-lg shadow-emerald-600/30 transition-all active:scale-95"
-                  >
-                    <CheckCircle2 className="w-5 h-5" />
-                    [Approve]
-                  </button>
-                  <button
-                    onClick={handleReject}
-                    className="flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-semibold shadow-lg shadow-rose-600/30 transition-all active:scale-95"
-                  >
-                    <XCircle className="w-5 h-5" />
-                    [Reject]
-                  </button>
-                </>
-              ) : approvalState === 'approved' ? (
-                <div className="flex items-center gap-3 px-5 py-3 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 font-mono text-sm">
-                  <CheckCircle2 className="w-5 h-5 text-emerald-400" />
-                  <div>
-                    <div className="font-bold">OPERATOR APPROVED ACTION</div>
-                    <div className="text-xs text-emerald-400/80">Command transmitted at {approvalTimestamp}</div>
-                  </div>
-                  <button 
-                    onClick={() => setApprovalState(null)} 
-                    className="ml-2 text-xs text-slate-400 hover:text-white underline"
-                  >
-                    Reset
-                  </button>
-                </div>
-              ) : (
-                <div className="flex items-center gap-3 px-5 py-3 rounded-xl bg-rose-500/20 border border-rose-500/40 text-rose-300 font-mono text-sm">
-                  <XCircle className="w-5 h-5 text-rose-400" />
-                  <div>
-                    <div className="font-bold">OPERATOR OVERRIDE / REJECTED</div>
-                    <div className="text-xs text-rose-400/80">Manual flight retained at {approvalTimestamp}</div>
-                  </div>
-                  <button 
-                    onClick={() => setApprovalState(null)} 
-                    className="ml-2 text-xs text-slate-400 hover:text-white underline"
-                  >
-                    Reset
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-        </section>
-      )}
-
-      {/* ── MAIN DASHBOARD GRID: FORM + RF CHART ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        {/* Left Column: Telemetry Form */}
-        <section className="lg:col-span-5 bg-slate-900/90 border border-slate-800 rounded-2xl p-6 space-y-6">
-          <div className="flex items-center justify-between pb-4 border-b border-slate-800">
-            <div className="flex items-center gap-2">
-              <Sliders className="w-5 h-5 text-indigo-400" />
-              <h2 className="text-lg font-semibold text-white">Live Telemetry Form</h2>
-            </div>
-            <span className="text-xs font-mono text-slate-400">UAV Downlink</span>
-          </div>
-
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              runAnalysis();
-            }}
-            className="space-y-5"
-          >
-            {/* Packet Loss */}
-            <div className="space-y-2">
-              <div className="flex justify-between items-center text-sm">
-                <label className="flex items-center gap-2 text-slate-300 font-medium">
-                  <Activity className="w-4 h-4 text-cyan-400" />
-                  Packet Loss
-                </label>
-                <span className="font-mono text-indigo-400 font-semibold">
-                  {telemetry.packet_loss_percent}%
-                </span>
-              </div>
-              <input
-                type="range"
-                min="0"
-                max="100"
-                step="1"
-                value={telemetry.packet_loss_percent}
-                onChange={(e) =>
-                  setTelemetry({ ...telemetry, packet_loss_percent: parseFloat(e.target.value) })
+            <button 
+              onClick={() => {
+                if (activeTab === 'spectrumguard') {
+                  setActiveTab('video');
+                  triggerToast('Switched to Video Landing Page');
+                } else {
+                  setActiveTab('spectrumguard');
+                  triggerToast('Opened SpectrumGuard Mission Monitor');
                 }
-                className="w-full accent-indigo-500 bg-slate-800 h-2 rounded-lg cursor-pointer"
-              />
-              <div className="flex justify-between text-[11px] text-slate-500 font-mono">
-                <span>0% (Ideal)</span>
-                <span>25% (Warning)</span>
-                <span>50%+ (Critical)</span>
-              </div>
-            </div>
-
-            {/* RSSI Signal Strength */}
-            <div className="space-y-2">
-              <div className="flex justify-between items-center text-sm">
-                <label className="flex items-center gap-2 text-slate-300 font-medium">
-                  <Wifi className="w-4 h-4 text-emerald-400" />
-                  Signal RSSI
-                </label>
-                <span className="font-mono text-indigo-400 font-semibold">
-                  {telemetry.rssi_dbm} dBm
-                </span>
-              </div>
-              <input
-                type="range"
-                min="-110"
-                max="-30"
-                step="1"
-                value={telemetry.rssi_dbm}
-                onChange={(e) =>
-                  setTelemetry({ ...telemetry, rssi_dbm: parseFloat(e.target.value) })
-                }
-                className="w-full accent-indigo-500 bg-slate-800 h-2 rounded-lg cursor-pointer"
-              />
-              <div className="flex justify-between text-[11px] text-slate-500 font-mono">
-                <span>-110 dBm (Lost)</span>
-                <span>-85 dBm (Degraded)</span>
-                <span>-30 dBm (Strong)</span>
-              </div>
-            </div>
-
-            {/* Latency */}
-            <div className="space-y-2">
-              <div className="flex justify-between items-center text-sm">
-                <label className="flex items-center gap-2 text-slate-300 font-medium">
-                  <Clock className="w-4 h-4 text-amber-400" />
-                  Round-Trip Latency
-                </label>
-                <span className="font-mono text-indigo-400 font-semibold">
-                  {telemetry.latency_ms} ms
-                </span>
-              </div>
-              <input
-                type="range"
-                min="10"
-                max="1000"
-                step="10"
-                value={telemetry.latency_ms}
-                onChange={(e) =>
-                  setTelemetry({ ...telemetry, latency_ms: parseFloat(e.target.value) })
-                }
-                className="w-full accent-indigo-500 bg-slate-800 h-2 rounded-lg cursor-pointer"
-              />
-              <div className="flex justify-between text-[11px] text-slate-500 font-mono">
-                <span>10 ms</span>
-                <span>150 ms (Med)</span>
-                <span>300 ms+ (High)</span>
-              </div>
-            </div>
-
-            {/* GPS Satellites */}
-            <div className="space-y-2">
-              <div className="flex justify-between items-center text-sm">
-                <label className="flex items-center gap-2 text-slate-300 font-medium">
-                  <Satellite className="w-4 h-4 text-purple-400" />
-                  GPS Satellites Locked
-                </label>
-                <span className="font-mono text-indigo-400 font-semibold">
-                  {telemetry.gps_satellites}
-                </span>
-              </div>
-              <input
-                type="range"
-                min="0"
-                max="24"
-                step="1"
-                value={telemetry.gps_satellites}
-                onChange={(e) =>
-                  setTelemetry({ ...telemetry, gps_satellites: parseInt(e.target.value, 10) })
-                }
-                className="w-full accent-indigo-500 bg-slate-800 h-2 rounded-lg cursor-pointer"
-              />
-              <div className="flex justify-between text-[11px] text-slate-500 font-mono">
-                <span>0 (No Lock)</span>
-                <span>4 (Minimum)</span>
-                <span>12+ (Strong)</span>
-              </div>
-            </div>
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full mt-4 flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-medium shadow-lg shadow-indigo-600/30 transition-all disabled:opacity-50"
+              }}
+              className="nav-cta"
             >
-              {loading ? (
-                <>
-                  <RefreshCw className="w-4 h-4 animate-spin" />
-                  Evaluating Spectrum...
-                </>
+              {activeTab === 'spectrumguard' ? (
+                <>View Video Page</>
               ) : (
                 <>
-                  <Zap className="w-4 h-4" />
-                  Analyze Telemetry (POST /analyze)
+                  <Shield className="w-3.5 h-3.5" />
+                  Live RF Monitor
                 </>
               )}
             </button>
-          </form>
-        </section>
+          </nav>
 
-        {/* Right Column: RF Chart & Spectrum Visualizer */}
-        <section className="lg:col-span-7 bg-slate-900/90 border border-slate-800 rounded-2xl p-6 flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between pb-4 border-b border-slate-800">
-              <div className="flex items-center gap-2">
-                <Radio className="w-5 h-5 text-indigo-400" />
-                <h2 className="text-lg font-semibold text-white">RF Spectrum & Interference Chart</h2>
-              </div>
-              <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">
-                ISM 2.4 GHz Band
-              </span>
-            </div>
-
-            <p className="text-xs text-slate-400 mt-2">
-              Real-time FFT synthesis indicating spectral occupancy, control links, and detected jammer barrage signatures.
-            </p>
-
-            {/* SVG Spectrum Chart */}
-            <div className="mt-6 bg-slate-950 rounded-xl p-4 border border-slate-800/80 relative">
-              <div className="absolute top-3 right-3 text-[10px] font-mono text-amber-400/80 bg-amber-400/10 px-2 py-0.5 rounded border border-amber-400/20">
-                SIMULATED RF SPECTRUM (TEST BENCH)
-              </div>
-
-              <svg viewBox="0 0 600 240" className="w-full h-56">
-                <defs>
-                  <linearGradient id="rfNormal" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#10b981" stopOpacity="0.4" />
-                    <stop offset="100%" stopColor="#10b981" stopOpacity="0.0" />
-                  </linearGradient>
-                  <linearGradient id="rfDegraded" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#f59e0b" stopOpacity="0.4" />
-                    <stop offset="100%" stopColor="#f59e0b" stopOpacity="0.0" />
-                  </linearGradient>
-                  <linearGradient id="rfJammed" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#f43f5e" stopOpacity="0.5" />
-                    <stop offset="100%" stopColor="#f43f5e" stopOpacity="0.05" />
-                  </linearGradient>
-                </defs>
-
-                {/* Grid Lines */}
-                {[-100, -80, -60, -40, -20].map((dbm, idx) => {
-                  const y = 30 + idx * 40;
-                  return (
-                    <g key={dbm}>
-                      <line x1="40" y1={y} x2="580" y2={y} stroke="#1e293b" strokeDasharray="3 3" />
-                      <text x="32" y={y + 4} fill="#64748b" fontSize="10" textAnchor="end" fontFamily="monospace">
-                        {dbm}
-                      </text>
-                    </g>
-                  );
-                })}
-
-                {/* Frequency Axis */}
-                {['2400', '2420', '2440', '2460', '2483.5'].map((freq, idx) => {
-                  const x = 50 + idx * 125;
-                  return (
-                    <text key={freq} x={x} y="215" fill="#64748b" fontSize="10" textAnchor="middle" fontFamily="monospace">
-                      {freq} MHz
-                    </text>
-                  );
-                })}
-
-                {/* Noise Floor / Spectral Shape */}
-                {simulatedState === 'normal' && (
-                  <>
-                    <path
-                      d="M 50 190 Q 120 185 180 188 Q 230 185 240 60 Q 250 185 320 188 Q 400 185 410 80 Q 420 185 570 190 L 570 200 L 50 200 Z"
-                      fill="url(#rfNormal)"
-                    />
-                    <path
-                      d="M 50 190 Q 120 185 180 188 Q 230 185 240 60 Q 250 185 320 188 Q 400 185 410 80 Q 420 185 570 190"
-                      fill="none"
-                      stroke="#10b981"
-                      strokeWidth="2"
-                    />
-                    <text x="240" y="50" fill="#10b981" fontSize="10" textAnchor="middle" fontFamily="monospace">
-                      Control Link (-48 dBm)
-                    </text>
-                    <text x="410" y="70" fill="#10b981" fontSize="10" textAnchor="middle" fontFamily="monospace">
-                      HD Video (-58 dBm)
-                    </text>
-                  </>
-                )}
-
-                {simulatedState === 'degraded' && (
-                  <>
-                    <path
-                      d="M 50 160 Q 100 140 160 150 Q 210 130 240 95 Q 270 145 340 130 Q 380 115 410 110 Q 450 145 570 160 L 570 200 L 50 200 Z"
-                      fill="url(#rfDegraded)"
-                    />
-                    <path
-                      d="M 50 160 Q 100 140 160 150 Q 210 130 240 95 Q 270 145 340 130 Q 380 115 410 110 Q 450 145 570 160"
-                      fill="none"
-                      stroke="#f59e0b"
-                      strokeWidth="2"
-                    />
-                    <text x="240" y="85" fill="#f59e0b" fontSize="10" textAnchor="middle" fontFamily="monospace">
-                      Degraded Link (-72 dBm)
-                    </text>
-                    <text x="340" y="120" fill="#f59e0b" fontSize="10" textAnchor="middle" fontFamily="monospace">
-                      Multipath Spikes
-                    </text>
-                  </>
-                )}
-
-                {simulatedState === 'jammed' && (
-                  <>
-                    <path
-                      d="M 50 110 Q 150 40 250 45 Q 350 35 450 48 Q 520 60 570 100 L 570 200 L 50 200 Z"
-                      fill="url(#rfJammed)"
-                    />
-                    <path
-                      d="M 50 110 Q 150 40 250 45 Q 350 35 450 48 Q 520 60 570 100"
-                      fill="none"
-                      stroke="#f43f5e"
-                      strokeWidth="2.5"
-                    />
-                    <text x="300" y="30" fill="#f43f5e" fontSize="11" textAnchor="middle" fontWeight="bold" fontFamily="monospace">
-                      ⚠️ BARRAGE JAMMER DETECTED (-32 dBm OVER 60 MHz BW)
-                    </text>
-                  </>
-                )}
-              </svg>
-            </div>
-          </div>
-
-          <div className="mt-4 pt-3 border-t border-slate-800 flex items-center justify-between text-xs text-slate-400 font-mono">
-            <span>Center: 2441.7 MHz</span>
-            <span>Span: 83.5 MHz</span>
-            <span className={simulatedState === 'jammed' ? 'text-rose-400 font-bold' : 'text-slate-300'}>
-              Jammer Signature: {simulatedState === 'jammed' ? 'POSITIVE' : 'NONE'}
-            </span>
-          </div>
-        </section>
-      </div>
-
-      {/* ── BACKEND API RESPONSE PANEL (POST /analyze) ── */}
-      <section className="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-800 gap-2">
-          <div className="flex items-center gap-2">
-            <Terminal className="w-5 h-5 text-indigo-400" />
-            <h2 className="text-lg font-semibold text-white">
-              Backend Response Panel (POST /analyze)
-            </h2>
-          </div>
-          <div className="flex items-center gap-3">
-            {analysis && (
-              <span className="text-xs font-mono px-2.5 py-1 rounded bg-slate-800 text-slate-300 border border-slate-700">
-                Source: <span className="text-indigo-400 font-semibold">{analysis.source}</span>
-              </span>
-            )}
-          </div>
-        </div>
-
-        {apiError && (
-          <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-sm flex items-center gap-3">
-            <AlertTriangle className="w-5 h-5 flex-shrink-0" />
-            <div>
-              <div className="font-semibold">Backend Communication Failed</div>
-              <div className="text-xs text-rose-300/80">{apiError}</div>
-              <div className="text-xs mt-1 text-slate-400">
-                Make sure uvicorn is running at <code className="text-white">http://localhost:8000</code>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {analysis ? (
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
-            {/* Risk & Recommendation Column */}
-            <div className="md:col-span-4 space-y-4">
-              <div className="p-4 rounded-xl bg-slate-950 border border-slate-800">
-                <span className="text-xs font-mono text-slate-400 uppercase">Assessed Risk Tier</span>
-                <div className="mt-1 flex items-center gap-2">
-                  <span className={`px-3 py-1 rounded-md text-sm font-bold font-mono ${riskStyle.badge}`}>
-                    {analysis.risk}
-                  </span>
+      {/* ── AEROVISION DRONE POSTER UI ── */}
+      {(activeTab === 'showcase' || activeTab === 'both') && (
+        <main className="poster" id="showcase-poster">
+          {/* Hero Section */}
+          <section className="hero">
+            <div className="hero-copy">
+              <h1>MORE FEATURES.<br /><span>MORE POSSIBILITIES.</span></h1>
+              <h2>Designed for performance.<br />Built for explorers.</h2>
+              <p className="intro">
+                Packed with intelligent features<br />
+                to make every flight easier,<br />
+                safer, and more exciting.
+              </p>
+              <div className="hero-rule" />
+              <div className="hero-benefits">
+                <div 
+                  onClick={() => {
+                    setActiveTab('spectrumguard');
+                    triggerToast('Opening SpectrumGuard RF Safe Flight Subsystem');
+                  }}
+                  style={{ cursor: 'pointer' }}
+                  title="Click to inspect SpectrumGuard Safe Flight Subsystem"
+                >
+                  <span className="benefit-icon">♧</span>
+                  <b>SAFE FLIGHT</b>
+                  <small>TECHNOLOGY ↗</small>
+                </div>
+                <div>
+                  <span className="benefit-icon">▣</span>
+                  <b>STUNNING</b>
+                  <small>FOOTAGE</small>
+                </div>
+                <div>
+                  <span className="benefit-icon">⌖</span>
+                  <b>SMART & EASY</b>
+                  <small>TO USE</small>
                 </div>
               </div>
+            </div>
 
-              <div className="p-4 rounded-xl bg-slate-950 border border-slate-800">
-                <span className="text-xs font-mono text-slate-400 uppercase">Recommended Action</span>
-                <p className="mt-1 font-semibold text-white text-base">
-                  {analysis.recommended_action}
+            <div className="hero-photo">
+              <img 
+                src="https://images.unsplash.com/photo-1506947411487-a56738267384?auto=format&fit=crop&w=1400&q=90" 
+                alt="Drone flying above a scenic landscape" 
+              />
+            </div>
+
+            <div className="camera-badge">
+              <strong>4K</strong>
+              <span>ULTRA HD<br />CAMERA</span>
+            </div>
+          </section>
+
+          {/* Smart Features Strip */}
+          <section className="features">
+            <div className="section-title">
+              <span />
+              <h2>SMART FEATURES FOR BETTER FLIGHTS</h2>
+              <span />
+            </div>
+
+            <div className="feature-grid">
+              {/* Feature 1: Optical Flow */}
+              <article className="feature">
+                <div className="feature-heading">
+                  <span className="feature-icon">◉</span>
+                  <div>
+                    <h3>OPTICAL FLOW<br />POSITIONING</h3>
+                    <p>Stay stable indoors and outdoors with precise hovering.</p>
+                  </div>
+                </div>
+                <div className="feature-image optical">
+                  <div className="floor-grid" />
+                  <div className="mini-drone">✣</div>
+                  <span className="beam" />
+                </div>
+              </article>
+
+              {/* Feature 2: Battery */}
+              <article className="feature">
+                <div className="feature-heading">
+                  <span className="feature-icon">▣</span>
+                  <div>
+                    <h3>LONG BATTERY LIFE</h3>
+                    <p>Enjoy extended flight time and explore more without limits.</p>
+                  </div>
+                </div>
+                <div className="battery">
+                  <strong>18</strong>
+                  <span>MINS<br />FLIGHT TIME*</span>
+                </div>
+                <small className="disclaimer">
+                  *Actual flight time may vary<br />based on environment.
+                </small>
+              </article>
+
+              {/* Feature 3: Waypoint Flight */}
+              <article className="feature">
+                <div className="feature-heading">
+                  <span className="feature-icon">⌖</span>
+                  <div>
+                    <h3>WAYPOINT<br />FLIGHT</h3>
+                    <p>Plan a route, set waypoints, and let the drone fly for you.</p>
+                  </div>
+                </div>
+                <div className="feature-image waypoint">
+                  <svg viewBox="0 0 220 120" aria-hidden="true">
+                    <path 
+                      d="M22 95 C55 20 100 110 135 55 S185 25 200 12" 
+                      fill="none" 
+                      stroke="#fff" 
+                      strokeWidth="2" 
+                      strokeDasharray="5 5" 
+                    />
+                    <circle cx="22" cy="95" r="6" fill="#fff" />
+                    <circle cx="200" cy="12" r="6" fill="#fff" />
+                    <path d="M135 55 l-5 -12 m5 12 l12 -4" stroke="#fff" strokeWidth="2" fill="none" />
+                  </svg>
+                </div>
+              </article>
+
+              {/* Feature 4: Follow Me */}
+              <article className="feature">
+                <div className="feature-heading">
+                  <span className="feature-icon">♧</span>
+                  <div>
+                    <h3>FOLLOW ME<br />MODE</h3>
+                    <p>The drone follows you automatically wherever you go.</p>
+                  </div>
+                </div>
+                <div className="feature-image follow">
+                  <span className="tracking-frame" />
+                  <span className="walker">●</span>
+                  <small>SUBJECT TRACKING</small>
+                </div>
+              </article>
+
+              {/* Feature 5: Gesture Control */}
+              <article className="feature">
+                <div className="feature-heading">
+                  <span className="feature-icon">♧</span>
+                  <div>
+                    <h3>GESTURE<br />CONTROL</h3>
+                    <p>Take photos or videos with simple hand gestures.</p>
+                  </div>
+                </div>
+                <div className="feature-image gesture">
+                  <span className="peace">✌</span>
+                  <span className="tracking-frame" />
+                </div>
+              </article>
+            </div>
+          </section>
+
+          {/* Details Dual Columns */}
+          <section className="details">
+            <article className="detail stability">
+              <div className="detail-copy">
+                <h2>ENHANCED STABILITY,<br />SMOOTHER FOOTAGE</h2>
+                <p>Advanced gyroscope and wind resistance for stable flights even in breezy conditions.</p>
+                <div className="wind">
+                  <span>≋</span>
+                  <b>WIND RESISTANCE<br />LEVEL 5</b>
+                </div>
+              </div>
+              <img 
+                src="https://images.unsplash.com/photo-1473968512647-3e447244af8f?auto=format&fit=crop&w=900&q=85" 
+                alt="Compact drone in flight" 
+              />
+            </article>
+
+            <article className="detail control">
+              <div className="detail-copy">
+                <h2>ONE KEY. TOTAL CONTROL.</h2>
+                <p>Take off, land, or return home with a single press. Flying has never been easier.</p>
+                <ul>
+                  <li><span>⌖</span> ONE KEY TAKE OFF / LANDING</li>
+                  <li><span>⌂</span> AUTO RETURN HOME</li>
+                  <li><span>▣</span> LOW BATTERY RETURN</li>
+                </ul>
+              </div>
+              <div className="home-scene">
+                <div className="drone-mark">✣</div>
+                <div className="home-ring">
+                  <b>H</b>
+                </div>
+              </div>
+            </article>
+          </section>
+
+          {/* What's In The Box */}
+          <section className="box-content">
+            <h2>WHAT'S IN THE BOX</h2>
+            <div className="kit-grid">
+              <div className="kit">
+                <div className="kit-visual drone-kit">✣</div>
+                <b>DRONE</b>
+              </div>
+              <div className="kit">
+                <div className="kit-visual remote-kit">▤</div>
+                <b>REMOTE<br />CONTROLLER</b>
+              </div>
+              <div className="kit">
+                <div className="kit-visual battery-kit">▮</div>
+                <b>BATTERY</b>
+              </div>
+              <div className="kit">
+                <div className="kit-visual prop-kit">✳</div>
+                <b>SPARE<br />PROPELLERS</b>
+              </div>
+              <div className="kit">
+                <div className="kit-visual cable-kit">⌁</div>
+                <b>USB<br />CHARGING CABLE</b>
+              </div>
+              <div className="kit">
+                <div className="kit-visual tool-kit">╱</div>
+                <b>SCREWDRIVER</b>
+              </div>
+              <div className="kit">
+                <div className="kit-visual case-kit">▰</div>
+                <b>CARRYING<br />CASE</b>
+              </div>
+              <div className="kit">
+                <div className="kit-visual manual-kit">▧</div>
+                <b>USER<br />MANUAL</b>
+              </div>
+            </div>
+          </section>
+
+          {/* Trust Footer */}
+          <footer className="footer">
+            <div>
+              <span>♧</span>
+              <p><b>PREMIUM QUALITY</b><small>BUILT TO LAST</small></p>
+            </div>
+            <div>
+              <span>♧</span>
+              <p><b>EXCELLENT SUPPORT</b><small>WE'RE HERE TO HELP</small></p>
+            </div>
+            <div>
+              <span>♙</span>
+              <p><b>SECURE PAYMENT</b><small>SAFE & TRUSTED</small></p>
+            </div>
+            <div>
+              <span>▱</span>
+              <p><b>FAST SHIPPING</b><small>DELIVERED TO YOU</small></p>
+            </div>
+          </footer>
+        </main>
+      )}
+
+      {/* ── SPECTRUMGUARD RF SAFETY MONITOR & AI COPILOT ── */}
+      {(activeTab === 'spectrumguard' || activeTab === 'both') && (
+        <section className="max-w-[1040px] mx-auto mt-8 bg-neutral-900 border border-neutral-700/80 rounded-xl p-6 text-neutral-100 shadow-2xl">
+          {/* Header */}
+          <div className="flex flex-col md:flex-row md:items-center justify-between pb-6 border-b border-neutral-800 gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-neutral-800 border border-neutral-700 flex items-center justify-center text-white">
+                <Shield className="w-6 h-6 text-neutral-200" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-xl font-bold font-condensed tracking-wide uppercase text-white">
+                    SpectrumGuard™ Safety Subsystem
+                  </h2>
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-neutral-800 text-neutral-300 border border-neutral-700">
+                    RF Shield v0.1
+                  </span>
+                </div>
+                <p className="text-xs text-neutral-400">
+                  Autonomous RF Spectrum Safety Monitor & Gemma AI Incident Copilot for Drone X4
                 </p>
               </div>
             </div>
 
-            {/* Gemma 4 Explanation Column */}
-            <div className="md:col-span-8 p-5 rounded-xl bg-slate-950 border border-slate-800 flex flex-col justify-between">
-              <div>
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    <Cpu className="w-4 h-4 text-indigo-400" />
-                    <span className="text-xs font-mono text-slate-300 font-semibold uppercase">
-                      Gemma 4 Safety Copilot Briefing
-                    </span>
+            <div className="flex items-center gap-2 text-xs font-mono">
+              <span className="text-neutral-400">API:</span>
+              <span className="text-neutral-300">{API_URL}/analyze</span>
+              <span className={`px-2 py-0.5 rounded text-[11px] font-semibold ${
+                backendStatus === 'online' 
+                  ? 'bg-emerald-950 text-emerald-400 border border-emerald-800' 
+                  : 'bg-rose-950 text-rose-400 border border-rose-800'
+              }`}>
+                {backendStatus === 'online' ? 'ONLINE' : 'OFFLINE'}
+              </span>
+            </div>
+          </div>
+
+          {/* Preset Buttons & Auto-Simulator */}
+          <div className="my-6 p-4 bg-neutral-950 rounded-lg border border-neutral-800 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+            <div>
+              <span className="text-xs font-mono uppercase text-neutral-400">Flight Environment Preset:</span>
+              <div className="flex items-center gap-2 mt-2">
+                {Object.keys(presets).map((key) => (
+                  <button
+                    key={key}
+                    onClick={() => applyPreset(key)}
+                    className={`px-3 py-1.5 rounded text-xs font-medium uppercase font-mono transition-all ${
+                      simulatedState === key
+                        ? 'bg-white text-black font-bold shadow'
+                        : 'bg-neutral-800 text-neutral-300 hover:bg-neutral-700'
+                    }`}
+                  >
+                    {presets[key].name}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <button
+              onClick={() => {
+                setIsSimulatingTimeline(!isSimulatingTimeline);
+                triggerToast(isSimulatingTimeline ? 'Timeline Simulation Paused' : 'Timeline Simulation Started');
+              }}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded text-xs font-mono transition-all ${
+                isSimulatingTimeline
+                  ? 'bg-amber-500 text-black font-bold'
+                  : 'bg-neutral-800 hover:bg-neutral-700 text-neutral-200'
+              }`}
+            >
+              {isSimulatingTimeline ? (
+                <>
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                  Auto-Cycling Scenarios (6s)
+                </>
+              ) : (
+                <>
+                  <Play className="w-3.5 h-3.5" />
+                  Auto-Simulate Interference Loop
+                </>
+              )}
+            </button>
+          </div>
+
+          {/* Operator Action / Approval Banner */}
+          {analysis && analysis.risk !== 'LOW' && (
+            <div className={`mb-6 p-4 rounded-lg border transition-all ${riskStyle.bg} ${riskStyle.border} ${riskStyle.glow}`}>
+              <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className={`w-6 h-6 mt-0.5 ${riskStyle.text}`} />
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className={`px-2 py-0.5 rounded text-xs font-mono uppercase font-bold ${riskStyle.badge}`}>
+                        {analysis.risk} RISK
+                      </span>
+                      <span className="text-sm font-semibold text-white">
+                        Recommended Action: {analysis.recommended_action}
+                      </span>
+                    </div>
+                    <p className="text-xs text-neutral-300 mt-1">
+                      Critical telemetry breach detected. Operator intervention or safety override required.
+                    </p>
                   </div>
-                  <span className="text-[11px] font-mono text-slate-500">&lt; 120 words</span>
                 </div>
 
-                <div className="text-sm text-slate-200 leading-relaxed font-sans whitespace-pre-line bg-slate-900/60 p-4 rounded-lg border border-slate-800/80">
-                  {analysis.gemma_explanation}
+                <div className="flex items-center gap-2 self-end md:self-auto">
+                  {approvalState === null ? (
+                    <>
+                      <button
+                        onClick={handleApprove}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded text-xs font-semibold shadow transition-all"
+                      >
+                        <CheckCircle2 className="w-4 h-4" />
+                        Approve Action
+                      </button>
+                      <button
+                        onClick={handleReject}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 rounded text-xs font-medium border border-neutral-700 transition-all"
+                      >
+                        <XCircle className="w-4 h-4" />
+                        Hold / Dismiss
+                      </button>
+                    </>
+                  ) : (
+                    <div className="text-xs font-mono px-3 py-1.5 rounded bg-neutral-900 border border-neutral-700 flex items-center gap-2">
+                      <span className="text-neutral-400">STATUS:</span>
+                      <span className={approvalState === 'approved' ? 'text-emerald-400 font-bold' : 'text-rose-400 font-bold'}>
+                        {approvalState.toUpperCase()} at {approvalTimestamp}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Form & Spectrum Visualizer Grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            {/* Left: Telemetry Sliders */}
+            <div className="lg:col-span-5 bg-neutral-950 p-5 rounded-lg border border-neutral-800 space-y-4">
+              <div className="flex items-center justify-between pb-3 border-b border-neutral-800">
+                <div className="flex items-center gap-2">
+                  <Sliders className="w-4 h-4 text-neutral-300" />
+                  <span className="text-sm font-semibold uppercase tracking-wider font-mono">Live UAV Downlink</span>
+                </div>
+                <span className="text-[11px] font-mono text-neutral-500">2.4 GHz ISM</span>
+              </div>
+
+              <form 
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  runAnalysis();
+                }}
+                className="space-y-4"
+              >
+                {/* Packet Loss */}
+                <div>
+                  <div className="flex justify-between text-xs font-mono mb-1">
+                    <span className="text-neutral-400">Packet Loss:</span>
+                    <span className="text-white font-bold">{telemetry.packet_loss_percent}%</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    value={telemetry.packet_loss_percent}
+                    onChange={(e) => setTelemetry({ ...telemetry, packet_loss_percent: parseFloat(e.target.value) })}
+                    className="w-full accent-white bg-neutral-800 h-1.5 rounded cursor-pointer"
+                  />
+                </div>
+
+                {/* Signal RSSI */}
+                <div>
+                  <div className="flex justify-between text-xs font-mono mb-1">
+                    <span className="text-neutral-400">Signal RSSI:</span>
+                    <span className="text-white font-bold">{telemetry.rssi_dbm} dBm</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="-110"
+                    max="-30"
+                    value={telemetry.rssi_dbm}
+                    onChange={(e) => setTelemetry({ ...telemetry, rssi_dbm: parseFloat(e.target.value) })}
+                    className="w-full accent-white bg-neutral-800 h-1.5 rounded cursor-pointer"
+                  />
+                </div>
+
+                {/* Latency */}
+                <div>
+                  <div className="flex justify-between text-xs font-mono mb-1">
+                    <span className="text-neutral-400">Round-Trip Latency:</span>
+                    <span className="text-white font-bold">{telemetry.latency_ms} ms</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="10"
+                    max="1000"
+                    step="10"
+                    value={telemetry.latency_ms}
+                    onChange={(e) => setTelemetry({ ...telemetry, latency_ms: parseFloat(e.target.value) })}
+                    className="w-full accent-white bg-neutral-800 h-1.5 rounded cursor-pointer"
+                  />
+                </div>
+
+                {/* GPS Satellites */}
+                <div>
+                  <div className="flex justify-between text-xs font-mono mb-1">
+                    <span className="text-neutral-400">GPS Satellites Locked:</span>
+                    <span className="text-white font-bold">{telemetry.gps_satellites} sats</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0"
+                    max="24"
+                    value={telemetry.gps_satellites}
+                    onChange={(e) => setTelemetry({ ...telemetry, gps_satellites: parseInt(e.target.value, 10) })}
+                    className="w-full accent-white bg-neutral-800 h-1.5 rounded cursor-pointer"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full mt-2 py-2.5 px-4 bg-white text-black font-semibold rounded text-xs uppercase tracking-wider font-mono hover:bg-neutral-200 transition-all flex items-center justify-center gap-2"
+                >
+                  {loading ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      Analyzing Telemetry...
+                    </>
+                  ) : (
+                    <>
+                      <Zap className="w-3.5 h-3.5" />
+                      Analyze Telemetry (POST /analyze)
+                    </>
+                  )}
+                </button>
+              </form>
+            </div>
+
+            {/* Right: RF Spectrum Visualizer */}
+            <div className="lg:col-span-7 bg-neutral-950 p-5 rounded-lg border border-neutral-800 flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between pb-3 border-b border-neutral-800">
+                  <div className="flex items-center gap-2">
+                    <Radio className="w-4 h-4 text-neutral-300" />
+                    <span className="text-sm font-semibold uppercase tracking-wider font-mono">
+                      RF Spectrum & FFT Synthesis
+                    </span>
+                  </div>
+                  <span className="text-[10px] font-mono text-neutral-400 bg-neutral-900 px-2 py-0.5 rounded border border-neutral-800">
+                    STATUS: {simulatedState.toUpperCase()}
+                  </span>
+                </div>
+
+                <div className="mt-4 bg-black rounded border border-neutral-800/80 p-3">
+                  <svg viewBox="0 0 600 220" className="w-full h-48">
+                    <defs>
+                      <linearGradient id="rfNormal" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#10b981" stopOpacity="0.4" />
+                        <stop offset="100%" stopColor="#10b981" stopOpacity="0.0" />
+                      </linearGradient>
+                      <linearGradient id="rfDegraded" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#f59e0b" stopOpacity="0.4" />
+                        <stop offset="100%" stopColor="#f59e0b" stopOpacity="0.0" />
+                      </linearGradient>
+                      <linearGradient id="rfJammed" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#f43f5e" stopOpacity="0.5" />
+                        <stop offset="100%" stopColor="#f43f5e" stopOpacity="0.05" />
+                      </linearGradient>
+                    </defs>
+
+                    {/* Grids */}
+                    {[-100, -80, -60, -40, -20].map((dbm, idx) => {
+                      const y = 25 + idx * 36;
+                      return (
+                        <g key={dbm}>
+                          <line x1="40" y1={y} x2="580" y2={y} stroke="#262626" strokeDasharray="3 3" />
+                          <text x="32" y={y + 4} fill="#666" fontSize="9" textAnchor="end" fontFamily="monospace">
+                            {dbm}
+                          </text>
+                        </g>
+                      );
+                    })}
+
+                    {/* Freqs */}
+                    {['2400', '2420', '2440', '2460', '2483.5'].map((freq, idx) => {
+                      const x = 50 + idx * 125;
+                      return (
+                        <text key={freq} x={x} y="195" fill="#666" fontSize="9" textAnchor="middle" fontFamily="monospace">
+                          {freq} MHz
+                        </text>
+                      );
+                    })}
+
+                    {/* RF Curves */}
+                    {simulatedState === 'normal' && (
+                      <>
+                        <path
+                          d="M 50 175 Q 120 170 180 172 Q 230 170 240 50 Q 250 170 320 172 Q 400 170 410 70 Q 420 170 570 175 L 570 180 L 50 180 Z"
+                          fill="url(#rfNormal)"
+                        />
+                        <path
+                          d="M 50 175 Q 120 170 180 172 Q 230 170 240 50 Q 250 170 320 172 Q 400 170 410 70 Q 420 170 570 175"
+                          fill="none"
+                          stroke="#10b981"
+                          strokeWidth="2"
+                        />
+                        <text x="240" y="40" fill="#10b981" fontSize="9" textAnchor="middle" fontFamily="monospace">
+                          Control Link (-48 dBm)
+                        </text>
+                        <text x="410" y="60" fill="#10b981" fontSize="9" textAnchor="middle" fontFamily="monospace">
+                          4K HD Video (-58 dBm)
+                        </text>
+                      </>
+                    )}
+
+                    {simulatedState === 'degraded' && (
+                      <>
+                        <path
+                          d="M 50 150 Q 100 130 160 140 Q 210 120 240 85 Q 270 135 340 120 Q 380 105 410 100 Q 450 135 570 150 L 570 180 L 50 180 Z"
+                          fill="url(#rfDegraded)"
+                        />
+                        <path
+                          d="M 50 150 Q 100 130 160 140 Q 210 120 240 85 Q 270 135 340 120 Q 380 105 410 100 Q 450 135 570 150"
+                          fill="none"
+                          stroke="#f59e0b"
+                          strokeWidth="2"
+                        />
+                        <text x="240" y="75" fill="#f59e0b" fontSize="9" textAnchor="middle" fontFamily="monospace">
+                          Degraded Link (-72 dBm)
+                        </text>
+                        <text x="340" y="110" fill="#f59e0b" fontSize="9" textAnchor="middle" fontFamily="monospace">
+                          Multipath Spikes
+                        </text>
+                      </>
+                    )}
+
+                    {simulatedState === 'jammed' && (
+                      <>
+                        <path
+                          d="M 50 100 Q 150 35 250 40 Q 350 30 450 42 Q 520 55 570 90 L 570 180 L 50 180 Z"
+                          fill="url(#rfJammed)"
+                        />
+                        <path
+                          d="M 50 100 Q 150 35 250 40 Q 350 30 450 42 Q 520 55 570 90"
+                          fill="none"
+                          stroke="#f43f5e"
+                          strokeWidth="2"
+                        />
+                        <text x="300" y="24" fill="#f43f5e" fontSize="10" textAnchor="middle" fontWeight="bold" fontFamily="monospace">
+                          ⚠️ BARRAGE JAMMER DETECTED (-32 dBm OVER 60 MHz BW)
+                        </text>
+                      </>
+                    )}
+                  </svg>
                 </div>
               </div>
 
-              <div className="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs font-mono text-slate-500">
-                <span>Guardrail: No offensive RF / Drone override claims</span>
-                <span className="text-indigo-400">Model: gemma4 (Ollama)</span>
+              <div className="mt-3 pt-2 border-t border-neutral-800 flex items-center justify-between text-[11px] font-mono text-neutral-400">
+                <span>Center: 2441.7 MHz</span>
+                <span>Span: 83.5 MHz</span>
+                <span className={simulatedState === 'jammed' ? 'text-rose-400 font-bold' : 'text-neutral-300'}>
+                  Jammer: {simulatedState === 'jammed' ? 'ACTIVE' : 'NONE'}
+                </span>
               </div>
             </div>
           </div>
-        ) : (
-          <div className="py-12 text-center text-slate-500 font-mono text-sm">
-            No analysis loaded. Submit telemetry to inspect backend response.
+
+          {/* Gemma 4 Explanation Briefing */}
+          {analysis && (
+            <div className="mt-6 p-4 rounded-lg bg-neutral-950 border border-neutral-800">
+              <div className="flex items-center justify-between pb-2 mb-3 border-b border-neutral-800">
+                <div className="flex items-center gap-2">
+                  <Cpu className="w-4 h-4 text-neutral-300" />
+                  <span className="text-xs font-mono uppercase font-bold text-neutral-200">
+                    Gemma 4 Safety Copilot Briefing
+                  </span>
+                </div>
+                <span className="text-[10px] font-mono text-neutral-500">
+                  Source: <strong className="text-neutral-300">{analysis.source}</strong>
+                </span>
+              </div>
+              <p className="text-xs text-neutral-300 font-sans leading-relaxed whitespace-pre-line bg-neutral-900/60 p-3 rounded border border-neutral-800/80">
+                {analysis.gemma_explanation}
+              </p>
+            </div>
+          )}
+        </section>
+      )}
+
+      {/* ── DESIGN REFERENCE MODAL ── */}
+      {showReferenceModal && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-neutral-900 border border-neutral-700 rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-5 relative">
+            <div className="flex items-center justify-between pb-3 border-b border-neutral-800">
+              <div className="flex items-center gap-2">
+                <Eye className="w-5 h-5 text-neutral-300" />
+                <h3 className="text-sm font-bold uppercase font-condensed tracking-wider text-white">
+                  Design Reference (AeroVision X4 Poster UI)
+                </h3>
+              </div>
+              <button 
+                onClick={() => setShowReferenceModal(false)}
+                className="text-neutral-400 hover:text-white p-1 rounded"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="mt-4 space-y-3 text-xs text-neutral-300">
+              <p>
+                This website faithfully implements the monochrome editorial drone design specification:
+              </p>
+              <ul className="list-disc list-inside space-y-1 text-neutral-400">
+                <li>Editorial Barlow Condensed headline &amp; 4K camera corner badge</li>
+                <li>Grayscale drone photography with soft tonal blending</li>
+                <li>Five-column high-contrast smart features strip</li>
+                <li>Side-by-side product detail cards with stability &amp; home waypoint</li>
+                <li>Eight-item accessory kit lineup &amp; dark trust footer</li>
+              </ul>
+              <div className="mt-4 border border-neutral-800 rounded overflow-hidden">
+                <img 
+                  src="/assets/design-reference.png" 
+                  alt="Original Design Reference" 
+                  className="w-full object-contain bg-black"
+                />
+              </div>
+            </div>
           </div>
-        )}
-
-        {/* Collapsible Raw JSON Viewer */}
-        {analysis && (
-          <details className="mt-4 border border-slate-800/80 rounded-xl bg-slate-950/60 p-3 group">
-            <summary className="text-xs font-mono text-slate-400 cursor-pointer hover:text-slate-200 select-none">
-              ▸ Inspect Raw API Response Payload (JSON)
-            </summary>
-            <pre className="mt-3 p-3 rounded-lg bg-slate-950 text-xs font-mono text-indigo-300 overflow-x-auto border border-slate-800">
-              {JSON.stringify(analysis, null, 2)}
-            </pre>
-          </details>
-        )}
-      </section>
-
-      {/* ── FOOTER ── */}
-      <footer className="pt-6 border-t border-slate-800 text-center text-xs text-slate-500 font-mono flex flex-col sm:flex-row items-center justify-between gap-3">
-        <span>SpectrumGuard — Open RF Safety Architecture</span>
-        <div className="flex items-center gap-4">
-          <span>Ollama Gemma 4 Integration</span>
-          <span>•</span>
-          <span>FastAPI + React</span>
         </div>
-      </footer>
-    </div>
+      )}
+
+      {/* ── TOAST NOTIFICATION ── */}
+      <div className={`toast ${showToast ? 'show' : ''}`}>
+        {toastMessage}
+      </div>
+        </div>
+      )}
+    </>
   );
 }
