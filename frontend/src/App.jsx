@@ -956,7 +956,7 @@ export default function App() {
               </ul>
               <div className="mt-4 border border-neutral-800 rounded overflow-hidden">
                 <img 
-                  src="/assets/design-reference.png" 
+                  src="./assets/design-reference.png" 
                   alt="Original Design Reference" 
                   className="w-full object-contain bg-black"
                 />

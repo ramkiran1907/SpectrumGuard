@@ -40,7 +40,7 @@ import {
 } from 'lucide-react';
 
 const TOTAL_FRAMES = 299;
-const FRAME_BASE_PATH = '/drone-frames/ezgif-frame-';
+const FRAME_BASE_PATH = './drone-frames/ezgif-frame-';
 
 // Story phases mapped to frame ranges
 const PHASES = [
